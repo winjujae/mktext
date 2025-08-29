@@ -29,20 +29,27 @@ def transcribe_audio(input_filename):
         num_workers=2               # 오디오 디코딩 워커
     )
 
-    print(f"🔊 {input_filename} 파일을 전사 중... (faster-whisper)")
+    print(f"🔊 {input_filename} 파일을 전사 중...")
 
     try:
         segments, info = model.transcribe(
-            input_path,
-            beam_size=1,             # 빠르게: 그리디
-            best_of=1,
-            vad_filter=True,         # 무음 구간 필터
-            vad_parameters={"min_silence_duration_ms": 500},
-            language="ko",           # 알면 지정(모르면 None)
-            temperature=0.0,
-            condition_on_previous_text=False,
-            word_timestamps=False
-        )
+        input_path,
+        language="ko",
+        beam_size=5,
+        patience=1.0,
+        vad_filter=True,
+        vad_parameters={"min_silence_duration_ms": 900},
+        condition_on_previous_text=True,
+        initial_prompt="회의 기록. 숫자/영어 고유명사 정확히.",
+        temperature=0.0,
+        temperature_increment_on_fallback=0.2,
+        compression_ratio_threshold=2.4,
+        logprob_threshold=-1.0,
+        no_speech_threshold=0.6,
+        # 성능/메모리
+        chunk_size=30,      # 너무 작으면 품질↓, 너무 크면 메모리↑
+        hallucination_silence_threshold=0.5
+    )
     except Exception as e:
         print(f"⚠️ 전사 중 오류 발생: {e}")
         return
