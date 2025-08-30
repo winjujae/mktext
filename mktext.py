@@ -18,38 +18,27 @@ def transcribe_audio(input_filename):
         print(f"❗ 지원하지 않는 파일 형식입니다. 지원되는 확장자: {', '.join(VALID_EXTENSIONS)}")
         return
 
-    # ---- 모델 로드 (하드웨어에 맞게 조정) ----
-    # GPU: device="cuda", compute_type="float16"
-    # CPU: device="cpu", compute_type="int8_float16" (또는 "int8")
-    model_size = "small"  # 필요 시 "base" / "medium" / "large-v3"
+    # ---- 모델 로드 (순정 설정에 가깝게) ----
+    model_size = "small"  # 필요시 "base"/"medium"/"large-v3"
     model = WhisperModel(
         model_size,
-        device="cpu",              # CPU면 "cpu"
-        compute_type="int8",     # CPU면 "int8_float16" 권장
-        num_workers=2               # 오디오 디코딩 워커
+        device="cpu",          # GPU면 "cuda"
+        compute_type="int8",   # CPU에서 가볍게
+        num_workers=2
     )
 
     print(f"🔊 {input_filename} 파일을 전사 중...")
 
     try:
+        # == 최소 옵션만 사용 ==
         segments, info = model.transcribe(
-        input_path,
-        language="ko",
-        beam_size=5,
-        patience=1.0,
-        vad_filter=True,
-        vad_parameters={"min_silence_duration_ms": 900},
-        condition_on_previous_text=True,
-        initial_prompt="회의 기록. 숫자/영어 고유명사 정확히.",
-        temperature=0.0,
-        temperature_increment_on_fallback=0.2,
-        compression_ratio_threshold=2.4,
-        logprob_threshold=-1.0,
-        no_speech_threshold=0.6,
-        # 성능/메모리
-        chunk_size=30,      # 너무 작으면 품질↓, 너무 크면 메모리↑
-        hallucination_silence_threshold=0.5
-    )
+            input_path,
+            language="ko",
+            # 반복 완화에 꼭 필요한 2개만:
+            condition_on_previous_text=False,   # 문맥 누적 반복 방지 (공식 파라미터)
+            temperature=(0.0, 0.2, 0.4),        # 내장 온도 폴백 (공식 지원)
+            # 나머지는 전부 기본값(빔서치/필터/VAD 등)
+        )
     except Exception as e:
         print(f"⚠️ 전사 중 오류 발생: {e}")
         return
@@ -60,8 +49,9 @@ def transcribe_audio(input_filename):
 
     lines = []
     for seg in segments:
-        # seg.text는 앞에 공백이 포함될 수 있으니 strip
-        lines.append(wrapper.fill(seg.text.strip()))
+        text = (seg.text or "").strip()
+        if text:
+            lines.append(wrapper.fill(text))
 
     output_text = "\n".join(lines) if lines else ""
 
